@@ -65,10 +65,12 @@ def generate_isoradials(th0: float, r_vals: npt.NDArray[float], n_vals: Iterable
     alpha = np.linspace(0, 2 * np.pi, 1000)
     theta_0 = th0 * np.pi / 180
 
-    for r in r_vals:
-        color = cmocean.cm.ice((r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals)))
+    for n in sorted(n_vals)[::-1]:
+        for r in r_vals:
+            color = cmocean.cm.ice(
+                (r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals))
+            )
 
-        for n in sorted(n_vals)[::-1]:
             iso = Isoradial(
                 bh.reorient_alpha(alpha, n),
                 bh.impact_parameter(alpha, r, theta_0, n=n, m=1),
