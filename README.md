@@ -1,5 +1,9 @@
 # bhsim
 
+![A simulated image of black hole isoradials showing how the extreme gravity of
+the black hole distorts the appearance of an accretion
+disk.](isoradials-th0_80.png)
+
 This repository aims to recreate the main results from Luminet, J.P. AAP, 75,
 228-235 (1979). A few points of interest include
 
