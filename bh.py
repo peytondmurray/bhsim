@@ -5,6 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import scipy.special as sp
 import sympy as sy
+import sympy.physics.mechanics as sym
 
 import util
 
@@ -287,3 +288,31 @@ def lambda_objective() -> Callable[[float, float, float, float, int, float], flo
         .subs({"Q": expr_q()})
     )
     return lambdify(("P", "alpha", "theta_0", "r", "N", "M"), s)
+
+
+def expr_fs() -> sy.Symbol:
+    """Generate an expression for the flux of an accreting disk.
+
+    See equation 15 of Luminet (1977) for reference.
+
+    Returns
+    -------
+    sy.Symbol
+        Sympy expression for Fs.
+    """
+    m, rstar = sy.symbols("M, r^*")
+    mdot = sym.dynamicsymbols("m", level=1)
+
+    return (
+        ((3 * m * mdot) / (8 * sy.pi))
+        * (1 / ((rstar - 3) * rstar ** (5 / 2)))
+        * (
+            sy.sqrt(rstar)
+            - sy.sqrt(6)
+            + (sy.sqrt(3) / 3)
+            * sy.ln(
+                ((sy.sqrt(rstar) + sy.sqrt(3)) * (sy.sqrt(6) - sy.sqrt(3)))
+                / ((sy.sqrt(rstar) - sy.sqrt(3)) * (sy.sqrt(6) + sy.sqrt(3)))
+            )
+        )
+    )
