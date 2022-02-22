@@ -318,6 +318,11 @@ def expr_fs() -> sy.Symbol:
     )
 
 
+def expr_r_star() -> sy.Symbol:
+    m, r = sy.symbols('M, r')
+    return r / m
+
+
 def expr_one_plus_z() -> sy.Symbol:
     """Generate an expression for the redshift 1+z.
 
