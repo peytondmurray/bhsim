@@ -298,7 +298,7 @@ def expr_fs() -> sy.Symbol:
     Returns
     -------
     sy.Symbol
-        Sympy expression for Fs.
+        Sympy expression for Fs, the radiation flux of an accreting disk
     """
     m, rstar = sy.symbols("M, r^*")
     mdot = sym.dynamicsymbols("m", level=1)
@@ -316,3 +316,47 @@ def expr_fs() -> sy.Symbol:
             )
         )
     )
+
+
+def expr_one_plus_z() -> sy.Symbol:
+    """Generate an expression for the redshift 1+z.
+
+    See equation 19 in Luminet (1977) for reference.
+
+    Returns
+    -------
+    sy.Symbol()
+        Sympy expression for the redshift of the accretion disk
+    """
+    m, r, theta_0, alpha, b = sy.symbols("M, r, theta_0, alpha, b")
+    return (1 + sy.sqrt(m / r**3) * b * sy.sin(theta_0) * sy.sin(alpha)) / sy.sqrt(
+        1 - 3 * m / r
+    )
+
+
+def expr_f_0() -> sy.Symbol:
+    """Generate an expression for the observed bolometric flux.
+
+    Returns
+    -------
+    sy.Symbol
+
+    """
+    fs, opz = sy.symbols("F_s, 1+z")
+    return fs / opz**4
+
+
+def lambidify_f0() -> sy.Symbol:
+    f0 = (
+        expr_f_0()
+        .subs({"F_s": expr_fs()})
+        .subs({"u": expr_u()})
+        .subs({"u": expr_u()})
+        .subs({"u": expr_u()})
+        .subs({"u": expr_u()})
+        .subs({"zeta_inf": expr_zeta_inf()})
+        .subs({"gamma": expr_gamma()})
+        .subs({"k": expr_k()})
+        .subs({"Q": expr_q()})
+    )
+    return lambdify([], f0)

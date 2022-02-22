@@ -46,7 +46,9 @@ def main():
     plt.show()
 
 
-def generate_isoradials(th0: float, r_vals: npt.NDArray[float], n_vals: Iterable[int]):
+def generate_isoradials(
+    th0: float, r_vals: npt.NDArray[float], n_vals: Iterable[int], color=None, save=True
+):
     """Generate a svg of the isoradials.
 
     Parameters
@@ -67,9 +69,10 @@ def generate_isoradials(th0: float, r_vals: npt.NDArray[float], n_vals: Iterable
 
     for n in sorted(n_vals)[::-1]:
         for r in r_vals:
-            color = cmocean.cm.ice(
-                (r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals))
-            )
+            if color is None:
+                color = cmocean.cm.ice(
+                    (r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals))
+                )
 
             iso = Isoradial(
                 bh.reorient_alpha(alpha, n),
@@ -81,7 +84,10 @@ def generate_isoradials(th0: float, r_vals: npt.NDArray[float], n_vals: Iterable
 
             ax.plot(iso.alpha, iso.b, color=color)
 
-    plt.savefig(f"./isoradials-th0={th0}.svg")
+    if save:
+        plt.savefig(f"./isoradials-th0={th0}.svg")
+
+    return plt
 
 
 if __name__ == "__main__":
