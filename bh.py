@@ -3,9 +3,9 @@ from typing import Callable, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import scipy.special as sp
 import sympy as sy
-import sympy.physics.mechanics as sym
 
 import util
 
@@ -300,8 +300,7 @@ def expr_fs() -> sy.Symbol:
     sy.Symbol
         Sympy expression for Fs, the radiation flux of an accreting disk
     """
-    m, rstar = sy.symbols("M, r^*")
-    mdot = sym.dynamicsymbols("m", level=1)
+    m, rstar, mdot = sy.symbols(r"M, r^*, \dot{m}")
 
     return (
         ((3 * m * mdot) / (8 * sy.pi))
@@ -339,21 +338,35 @@ def expr_one_plus_z() -> sy.Symbol:
     )
 
 
-def expr_f_0() -> sy.Symbol:
+def expr_f0() -> sy.Symbol:
     """Generate an expression for the observed bolometric flux.
 
     Returns
     -------
     sy.Symbol
-
+        Sympy expression for the raw bolometric flux.
     """
     fs, opz = sy.symbols("F_s, 1+z")
     return fs / opz**4
 
 
+def expr_f0_normalized() -> sy.Symbol:
+    """Generate an expression for the normalized observed bolometric flux.
+
+    Units are in (8*pi)/(3*M*Mdot).
+
+    Returns
+    -------
+    sy.Symbol
+        Sympy expression for the normalized bolometric flux.
+    """
+    m, mdot = sy.symbols(r"M, \dot{m}")
+    return expr_f0() / ((8 * sy.pi) / (3 * m * mdot))
+
+
 def lambidify_f0() -> sy.Symbol:
     f0 = (
-        expr_f_0()
+        expr_f0()
         .subs({"F_s": expr_fs()})
         .subs({"u": expr_u()})
         .subs({"u": expr_u()})
@@ -365,3 +378,50 @@ def lambidify_f0() -> sy.Symbol:
         .subs({"Q": expr_q()})
     )
     return lambdify([], f0)
+
+
+def generate_abzrn(alpha, r_vals, theta_0, n_vals, m, **root_kwargs) -> pd.DataFrame:
+
+    a_arrs = []
+    b_arrs = []
+    opz_arrs = []
+    r_arrs = []
+    n_arrs = []
+
+    opz = sy.lambdify(["alpha", "b", "theta_0", "M", "r"], expr_one_plus_z())
+
+    for n in n_vals:
+        for r in r_vals:
+            a_arrs.append(alpha)
+            b = impact_parameter(alpha, r, theta_0, n, m, None, **root_kwargs)
+            b_arrs.append(b)
+            opz_arrs.append(opz(alpha, b, theta_0, m, r))
+            r_arrs.append(np.full_like(b.size, r))
+            n_arrs.append(np.full_like(b.size, n))
+
+    return pd.DataFrame(
+        {
+            "alpha": np.concatenate(a_arrs),
+            "b": np.concatenate(b_arrs),
+            "opz": np.concatenate(opz_arrs),
+            "r": np.concatenate(r_arrs),
+            "n": np.concatenate(n_arrs),
+        }
+    )
+
+
+def generate_image():
+
+    th0 = 80
+    theta_0 = th0 * np.pi / 180
+
+    abzrn = generate_abzrn(
+        np.linspace(0, 2 * np.pi, 1000),
+        np.arange(6, 40, 0.5),
+        theta_0,
+        [0],
+        1,
+        max_steps=3,
+    )
+
+    return
