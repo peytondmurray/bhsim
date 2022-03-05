@@ -6,6 +6,7 @@ import numpy.typing as npt
 import pandas as pd
 import scipy.special as sp
 import sympy as sy
+import rich.progress as rp
 
 import util
 
@@ -213,9 +214,7 @@ def reorient_alpha(alpha: Union[float, npt.NDArray[float]], n: int) -> float:
     float
         Reoriented polar angle
     """
-    if n > 0:
-        return (alpha + np.pi) % (2 * np.pi)
-    return alpha
+    return np.where(np.asarray(n) > 0, (alpha + np.pi) % (2 * np.pi), alpha)
 
 
 def lambdify(*args, **kwargs) -> Callable:
@@ -346,7 +345,7 @@ def expr_f0() -> sy.Symbol:
     sy.Symbol
         Sympy expression for the raw bolometric flux.
     """
-    fs, opz = sy.symbols("F_s, 1+z")
+    fs, opz = sy.symbols("F_s, z_op")
     return fs / opz**4
 
 
@@ -364,23 +363,19 @@ def expr_f0_normalized() -> sy.Symbol:
     return expr_f0() / ((8 * sy.pi) / (3 * m * mdot))
 
 
-def lambidify_f0() -> sy.Symbol:
-    f0 = (
-        expr_f0()
-        .subs({"F_s": expr_fs()})
-        .subs({"u": expr_u()})
-        .subs({"u": expr_u()})
-        .subs({"u": expr_u()})
-        .subs({"u": expr_u()})
-        .subs({"zeta_inf": expr_zeta_inf()})
-        .subs({"gamma": expr_gamma()})
-        .subs({"k": expr_k()})
-        .subs({"Q": expr_q()})
+def lambda_normalized_bolometric_flux():
+    return sy.lambdify(
+        ("z_op", "r", "M"),
+        (
+            expr_f0()
+            .subs({'F_s': expr_fs()})
+            .subs({'M': 1, r'\dot{m}': 1})
+            .subs({'r^*': expr_r_star()})
+        ) / (3 / (8 * sy.pi))
     )
-    return lambdify([], f0)
 
 
-def generate_abzrn(alpha, r_vals, theta_0, n_vals, m, **root_kwargs) -> pd.DataFrame:
+def generate_image(alpha, r_vals, theta_0, n_vals, m, **root_kwargs) -> pd.DataFrame:
 
     a_arrs = []
     b_arrs = []
@@ -391,15 +386,15 @@ def generate_abzrn(alpha, r_vals, theta_0, n_vals, m, **root_kwargs) -> pd.DataF
     opz = sy.lambdify(["alpha", "b", "theta_0", "M", "r"], expr_one_plus_z())
 
     for n in n_vals:
-        for r in r_vals:
+        for r in rp.track(r_vals):
             a_arrs.append(alpha)
             b = impact_parameter(alpha, r, theta_0, n, m, None, **root_kwargs)
             b_arrs.append(b)
             opz_arrs.append(opz(alpha, b, theta_0, m, r))
-            r_arrs.append(np.full_like(b.size, r))
-            n_arrs.append(np.full_like(b.size, n))
+            r_arrs.append(np.full(b.size, r))
+            n_arrs.append(np.full(b.size, n))
 
-    return pd.DataFrame(
+    df = pd.DataFrame(
         {
             "alpha": np.concatenate(a_arrs),
             "b": np.concatenate(b_arrs),
@@ -409,19 +404,9 @@ def generate_abzrn(alpha, r_vals, theta_0, n_vals, m, **root_kwargs) -> pd.DataF
         }
     )
 
-
-def generate_image():
-
-    th0 = 80
-    theta_0 = th0 * np.pi / 180
-
-    abzrn = generate_abzrn(
-        np.linspace(0, 2 * np.pi, 1000),
-        np.arange(6, 40, 0.5),
-        theta_0,
-        [0],
-        1,
-        max_steps=3,
-    )
-
-    return
+    flux = lambda_normalized_bolometric_flux()
+    df['x'] = df['b'] * np.cos(df['alpha'])
+    df['y'] = df['b'] * np.sin(df['alpha'])
+    df['flux'] = flux(df['opz'], df['r'], m)
+    df['alpha'] = reorient_alpha(df['alpha'], df['n'])
+    return df
