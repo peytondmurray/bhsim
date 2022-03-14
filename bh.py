@@ -1,12 +1,12 @@
 """A collection of expressions for equations in Luminet's paper used for generating images."""
-from typing import Callable, Optional, Union
+from typing import Callable, Iterable, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import rich.progress as rp
 import scipy.special as sp
 import sympy as sy
-import rich.progress as rp
 
 import util
 
@@ -317,7 +317,14 @@ def expr_fs() -> sy.Symbol:
 
 
 def expr_r_star() -> sy.Symbol:
-    m, r = sy.symbols('M, r')
+    """Generate an expression for r^*, the radial coordinate normalized by the black hole mass.
+
+    Returns
+    -------
+    sy.Symbol
+        Sympy expression for the radial coordinate normalized by the black hole mass.
+    """
+    m, r = sy.symbols("M, r")
     return r / m
 
 
@@ -363,20 +370,61 @@ def expr_f0_normalized() -> sy.Symbol:
     return expr_f0() / ((8 * sy.pi) / (3 * m * mdot))
 
 
-def lambda_normalized_bolometric_flux():
+def lambda_normalized_bolometric_flux() -> Callable[[float, float, float], float]:
+    """Generate the normalized bolometric flux function.
+
+    See `generate_image` for an example of how to use this.
+
+    Returns
+    -------
+    Callable[(float, float, float), float]
+        The returned function takes (1+z, r, M) as arguments and outputs the normalized bolometric
+        flux of the black hole.
+    """
     return sy.lambdify(
         ("z_op", "r", "M"),
         (
             expr_f0()
-            .subs({'F_s': expr_fs()})
-            .subs({'M': 1, r'\dot{m}': 1})
-            .subs({'r^*': expr_r_star()})
-        ) / (3 / (8 * sy.pi))
+            .subs({"F_s": expr_fs()})
+            .subs({"M": 1, r"\dot{m}": 1})
+            .subs({"r^*": expr_r_star()})
+        )
+        / (3 / (8 * sy.pi)),
     )
 
 
-def generate_image(alpha, r_vals, theta_0, n_vals, m, **root_kwargs) -> pd.DataFrame:
+def generate_image_data(
+    alpha: npt.NDArray[np.float64],
+    r_vals: Iterable[float],
+    theta_0: float,
+    n_vals: Iterable[int],
+    m: float,
+    **root_kwargs
+) -> pd.DataFrame:
+    """Generate the data needed to produce an image of a black hole.
 
+    Parameters
+    ----------
+    alpha : npt.NDArray[np.float64]
+        Alpha values at which the bolometric flux is to be simulated; angular coordinate in the
+        observer's frame of reference
+    r_vals : Iterable[float]
+        Orbital radius of a section of the accretion disk from the center of the black hole
+    theta_0 : float
+        Inclination of the observer, in radians, with respect to the the normal of the accretion
+        disk
+    n_vals : Iterable[int]
+        Order of the calculation; n=0 corresponds to the direct image, n>0 are ghost images
+    m : float
+        Mass of the black hole
+    **root_kwargs
+        All other kwargs are passed to the `impact_parameter` function
+
+    Returns
+    -------
+    pd.DataFrame
+        Simulated data; columns are alpha, b, 1+z, r, n, flux, x, y
+    """
     a_arrs = []
     b_arrs = []
     opz_arrs = []
@@ -405,8 +453,8 @@ def generate_image(alpha, r_vals, theta_0, n_vals, m, **root_kwargs) -> pd.DataF
     )
 
     flux = lambda_normalized_bolometric_flux()
-    df['x'] = df['b'] * np.cos(df['alpha'])
-    df['y'] = df['b'] * np.sin(df['alpha'])
-    df['flux'] = flux(df['opz'], df['r'], m)
-    df['alpha'] = reorient_alpha(df['alpha'], df['n'])
+    df["x"] = df["b"] * np.cos(df["alpha"])
+    df["y"] = df["b"] * np.sin(df["alpha"])
+    df["flux"] = flux(df["opz"], df["r"], m)
+    df["alpha"] = reorient_alpha(df["alpha"], df["n"])
     return df

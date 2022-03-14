@@ -1,7 +1,8 @@
 """Generate output figures of black hole images."""
-from typing import Iterable
+from typing import Iterable, Optional, Tuple
 
 import cmocean
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -47,8 +48,13 @@ def main():
 
 
 def generate_isoradials(
-    th0: float, r_vals: npt.NDArray[float], n_vals: Iterable[int], color=None, save=True
-):
+    th0: float,
+    r_vals: npt.NDArray[float],
+    n_vals: Iterable[int],
+    color: Optional[Tuple[float, float, float, float]] = None,
+    cmap: Optional[matplotlib.colors.LinearSegmentedColormap] = None,
+    save: bool = True,
+) -> matplotlib.figure.Figure:
     """Generate a svg of the isoradials.
 
     Parameters
@@ -59,6 +65,18 @@ def generate_isoradials(
         Distances from the black hole center to the isoradials to be plotted
     n_vals : Iterable[int]
         Order of the images calculated
+    color: Optional[Tuple(float, float, float, float)]
+        RGBA tuple of the color to use to plot the isoradials; otherwise, a colormap is used to map
+        isoradials of different r to different colors
+    cmap: Optional[matplotlib.colors.LinearSegmentedColormap]
+        Colormap to use if color is None
+    save: bool
+        If True, the image will be saved as an svg
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Image of the given black hole isoradials.
     """
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": "polar"})
     ax.set_theta_zero_location("S")
@@ -67,12 +85,13 @@ def generate_isoradials(
     alpha = np.linspace(0, 2 * np.pi, 1000)
     theta_0 = th0 * np.pi / 180
 
+    if cmap is None:
+        cmap = cmocean.cm.ice
+
     for n in sorted(n_vals)[::-1]:
         for r in r_vals:
             if color is None:
-                color = cmocean.cm.ice(
-                    (r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals))
-                )
+                color = cmap((r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals)))
 
             iso = Isoradial(
                 bh.reorient_alpha(alpha, n),
