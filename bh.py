@@ -399,13 +399,13 @@ def simulate_flux(
     theta_0: float,
     n: int,
     m: float,
-    root_kwargs: Dict[Any, Any],
     objective_func: Optional[Callable] = None,
+    root_kwargs: Optional[Dict[Any, Any]] = None,
 ) -> Tuple[
-    npt.NDArray[np.flot64],
-    npt.NDArray[np.flot64],
-    npt.NDArray[np.flot64],
-    npt.NDArray[np.flot64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
 ]:
     """Simulate the bolometric flux for an accretion disk near a black hole.
 
@@ -428,11 +428,12 @@ def simulate_flux(
 
     Returns
     -------
-    Tuple[npt.NDArray[np.flot64], ...]
+    Tuple[npt.NDArray[np.float64], ...]
         reoriented alpha, b, 1+z, and observed bolometric flux
     """
     flux = lambda_normalized_bolometric_flux()
     one_plus_z = sy.lambdify(["alpha", "b", "theta_0", "M", "r"], expr_one_plus_z())
+    root_kwargs = root_kwargs if root_kwargs else {}
 
     b = impact_parameter(alpha, r, theta_0, n, m, objective_func, **root_kwargs)
     opz = one_plus_z(alpha, b, theta_0, m, r)
