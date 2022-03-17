@@ -1,10 +1,10 @@
 """A collection of expressions for equations in Luminet's paper used for generating images."""
-from typing import Callable, Iterable, Optional, Union
+import multiprocessing as mp
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import rich.progress as rp
 import scipy.special as sp
 import sympy as sy
 
@@ -393,13 +393,60 @@ def lambda_normalized_bolometric_flux() -> Callable[[float, float, float], float
     )
 
 
+def simulate_flux(
+    alpha: npt.NDArray[np.float64],
+    r: float,
+    theta_0: float,
+    n: int,
+    m: float,
+    root_kwargs: Dict[Any, Any],
+    objective_func: Optional[Callable] = None,
+) -> Tuple[
+    npt.NDArray[np.flot64],
+    npt.NDArray[np.flot64],
+    npt.NDArray[np.flot64],
+    npt.NDArray[np.flot64],
+]:
+    """Simulate the bolometric flux for an accretion disk near a black hole.
+
+    Parameters
+    ----------
+    alpha : npt.NDArray[np.float64]
+        Polar angle in the observer's frame of reference
+    r : float
+        Isoradial distance for which the impact parameter is to be calculated
+    theta_0 : float
+        Inclination of the observer with respect to the accretion disk plane normal
+    n : int
+        Order of the calculation; n=0 corresponds to the direct image, n>0 are ghost images
+    m : float
+        Mass of the black hole
+    root_kwargs : Dict[Any, Any]
+        Additional arguments are passed to fast_root
+    objective_func : Optional[Callable]
+        Objective function whose roots are the periastron distances for a given b(alpha)
+
+    Returns
+    -------
+    Tuple[npt.NDArray[np.flot64], ...]
+        reoriented alpha, b, 1+z, and observed bolometric flux
+    """
+    flux = lambda_normalized_bolometric_flux()
+    one_plus_z = sy.lambdify(["alpha", "b", "theta_0", "M", "r"], expr_one_plus_z())
+
+    b = impact_parameter(alpha, r, theta_0, n, m, objective_func, **root_kwargs)
+    opz = one_plus_z(alpha, b, theta_0, m, r)
+
+    return reorient_alpha(alpha, n), b, opz, flux(opz, r, m)
+
+
 def generate_image_data(
     alpha: npt.NDArray[np.float64],
     r_vals: Iterable[float],
     theta_0: float,
     n_vals: Iterable[int],
     m: float,
-    **root_kwargs
+    root_kwargs,
 ) -> pd.DataFrame:
     """Generate the data needed to produce an image of a black hole.
 
@@ -417,7 +464,7 @@ def generate_image_data(
         Order of the calculation; n=0 corresponds to the direct image, n>0 are ghost images
     m : float
         Mass of the black hole
-    **root_kwargs
+    root_kwargs : Dict
         All other kwargs are passed to the `impact_parameter` function
 
     Returns
@@ -430,17 +477,22 @@ def generate_image_data(
     opz_arrs = []
     r_arrs = []
     n_arrs = []
+    flux_arrs = []
 
     opz = sy.lambdify(["alpha", "b", "theta_0", "M", "r"], expr_one_plus_z())
 
     for n in n_vals:
-        for r in rp.track(r_vals):
-            a_arrs.append(alpha)
-            b = impact_parameter(alpha, r, theta_0, n, m, None, **root_kwargs)
-            b_arrs.append(b)
-            opz_arrs.append(opz(alpha, b, theta_0, m, r))
-            r_arrs.append(np.full(b.size, r))
-            n_arrs.append(np.full(b.size, n))
+        with mp.Pool(mp.cpu_count()) as pool:
+            args = [(alpha, r, theta_0, n, m, None, root_kwargs) for r in r_vals]
+            for r, (alpha_reoriented, b, opz, flux) in zip(
+                r_vals, pool.starmap(simulate_flux, args)
+            ):
+                a_arrs.append(alpha_reoriented)
+                b_arrs.append(b)
+                opz_arrs.append(opz)
+                r_arrs.append(np.full(b.size, r))
+                n_arrs.append(np.full(b.size, n))
+                flux_arrs.append(flux)
 
     df = pd.DataFrame(
         {
@@ -449,12 +501,10 @@ def generate_image_data(
             "opz": np.concatenate(opz_arrs),
             "r": np.concatenate(r_arrs),
             "n": np.concatenate(n_arrs),
+            "flux": np.concatenate(flux_arrs),
         }
     )
 
-    flux = lambda_normalized_bolometric_flux()
     df["x"] = df["b"] * np.cos(df["alpha"])
     df["y"] = df["b"] * np.sin(df["alpha"])
-    df["flux"] = flux(df["opz"], df["r"], m)
-    df["alpha"] = reorient_alpha(df["alpha"], df["n"])
     return df

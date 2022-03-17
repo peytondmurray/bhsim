@@ -106,7 +106,59 @@ def generate_isoradials(
     if save:
         plt.savefig(f"./isoradials-th0={th0}.svg")
 
-    return plt
+    return fig
+
+
+def generate_image(
+    ax: Optional[matplotlib.axes.Axes],
+    alpha: npt.NDArray[float],
+    r_vals: npt.NDArray[float],
+    th0: float,
+    n_vals: Iterable[int],
+    m: float,
+    cmap: Optional[matplotlib.colors.LinearSegmentedColormap],
+) -> matplotlib.figure.Figure:
+    """Generate an image of the black hole.
+
+    Parameters
+    ----------
+    ax : Optional[matplotlib.axes.Axes]
+        Axes on which the image is to be drawn
+    alpha: npt.NDArray[float]
+        Polar angles for which the flux is to be plotted
+    r_vals : npt.NDArray[float]
+        Distances from the black hole center to the isoradials to be plotted
+    th0 : float
+        Inclination of the observer with respect to the accretion disk normal
+    n_vals : Iterable[int]
+        Order of the images calculated
+    m : float
+        Mass of the black hole
+    cmap : Optional[matplotlib.colors.LinearSegmentedColormap]
+        Colormap to use for plotting the image
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Image of the given black hole isoradials.
+    """
+    theta_0 = th0 * np.pi / 180
+    df = bh.generate_image_data(alpha, r_vals, theta_0, n_vals, m, {"max_steps": 3})
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"projection": "polar"})
+    else:
+        fig = ax.get_figure()
+
+    if cmap is None:
+        cmap = cmocean.cm.gray
+
+    ax.set_theta_zero_location("S")
+    ax.set_axis_off()
+    for n in sorted(n_vals, reverse=True):
+        df_n = df.loc[df["n"] == n]
+        ax.scatter(df_n["alpha"], df_n["b"], c=df_n["flux"], cmap=cmap)
+    return fig
 
 
 if __name__ == "__main__":
