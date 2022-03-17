@@ -1,5 +1,7 @@
 # bhsim
 
+![A simulated image of a black hole with an accretion disk.](blackhole.png)
+
 ![A simulated image of black hole isoradials showing how the extreme gravity of
 the black hole distorts the appearance of an accretion
 disk.](isoradials-th0=80.png)
