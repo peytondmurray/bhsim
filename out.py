@@ -60,7 +60,9 @@ def generate_isoradials(
     for n in sorted(n_vals)[::-1]:
         for r in r_vals:
             if color is None:
-                color = cmap((r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals)))
+                linecolor = cmap((r - np.min(r_vals)) / (np.max(r_vals) - np.min(r_vals)))
+            else:
+                linecolor = color
 
             iso = Isoradial(
                 bh.reorient_alpha(alpha, n),
@@ -70,7 +72,7 @@ def generate_isoradials(
                 n,
             )
 
-            ax.plot(iso.alpha, iso.b, color=color)
+            ax.plot(iso.alpha, iso.b, color=linecolor)
 
     return fig
 
